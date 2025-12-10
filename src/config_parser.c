@@ -595,6 +595,11 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Syntax: %s <command>\n", argv[0]);
         return 1;
     }
+
+    /* Make a copy of input and strip inline comments */
+    char *input = sstrdup(argv[1]);
+    strip_inline_comment(input);
+
     struct stack stack;
     memset(&stack, '\0', sizeof(struct stack));
     struct parser_ctx ctx = {
@@ -605,7 +610,8 @@ int main(int argc, char *argv[]) {
     SLIST_INIT(&(ctx.variables));
     struct context context;
     context.filename = "<stdin>";
-    parse_config(&ctx, argv[1], &context);
+    parse_config(&ctx, input, &context);
+    free(input);
 }
 
 #else

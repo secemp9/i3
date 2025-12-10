@@ -41,6 +41,45 @@
 
 xcb_xrm_database_t *database = NULL;
 
+/*
+ * Strips inline comments from a line buffer.
+ * Looks for " #" (space followed by hash) outside of quoted strings.
+ * Preserves the newline character if present.
+ * Modifies the buffer in place.
+ */
+static void strip_inline_comment(char *buffer) {
+    if (buffer == NULL || *buffer == '\0')
+        return;
+
+    bool in_quotes = false;
+    char *p = buffer;
+    char *comment_start = NULL;
+
+    while (*p != '\0') {
+        /* Track quote state (handle escaped quotes) */
+        if (*p == '"' && (p == buffer || *(p - 1) != '\\')) {
+            in_quotes = !in_quotes;
+        }
+        /* Look for " #" outside quotes - space before # to not break colors like #ffffff */
+        if (!in_quotes && *p == '#' && p > buffer && *(p - 1) == ' ') {
+            comment_start = p - 1;  /* Include the space before # */
+            break;
+        }
+        p++;
+    }
+
+    if (comment_start != NULL) {
+        /* Find if there's a newline at the end we need to preserve */
+        char *newline = strchr(comment_start, '\n');
+        if (newline != NULL) {
+            *comment_start = '\n';
+            *(comment_start + 1) = '\0';
+        } else {
+            *comment_start = '\0';
+        }
+    }
+}
+
 #ifndef TEST_PARSER
 pid_t config_error_nagbar_pid = -1;
 #endif
@@ -917,6 +956,12 @@ parse_file_result_t parse_file(struct parser_ctx *ctx, const char *f, IncludedFi
             }
             DLOG("line continuation in comment is ignored: \"%.*s\"\n", (int)strlen(buffer) - 1, buffer);
             continuation = NULL;
+        }
+
+        /* Strip inline comments (e.g., "bindsym $mod+f fullscreen toggle  # comment")
+         * before appending to buffer. Only strips " #" outside quotes. */
+        if (!comment) {
+            strip_inline_comment(buffer);
         }
 
         strncpy(buf + strlen(buf), buffer, strlen(buffer) + 1);
